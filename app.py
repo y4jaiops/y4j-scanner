@@ -5,13 +5,15 @@ from logic_sheets import append_to_sheet
 from logic_drive import get_file_from_link
 
 st.set_page_config(page_title="Y4J Scanner", page_icon="🇮🇳", layout="wide")
-st.title("🇮🇳 Youth4Jobs Smart Scanner")
+st.title("Y4J YouthScan")
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("Configuration")
     sheet_url = st.text_input("Paste Google Sheet URL here:")
-    default_cols = "Candidate Name, Phone Number, Disability Type, Education, Village/City, Skills"
+# default_cols = "Candidate Name, Phone Number, Disability Type, Education, Village/City, Skills"
+#First Name, Last Name,	ID Type,	ID Number,	Email,	Phone Number,	DateOfBirth,	Gender,	DisabilityType, Qualification,	State
+    default_cols = "First Name, Last Name,	ID Type,	ID Number,	Email,	Phone Number,	DateOfBirth,	Gender,	DisabilityType, Qualification,	State"
     cols_input = st.text_area("Columns to Extract", value=default_cols, height=150)
     target_columns = [x.strip() for x in cols_input.split(",") if x.strip()]
     
