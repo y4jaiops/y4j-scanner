@@ -2,12 +2,22 @@ import streamlit as st
 import pandas as pd
 import time
 from logic_gemini import parse_document_dynamic
-# Updated import to include the batch function
-from logic_sheets import append_to_sheet, append_batch_to_sheet
+from logic_sheets import append_batch_to_sheet
 from logic_drive import get_file_from_link
 
 st.set_page_config(page_title="Y4J YouthScan App", page_icon="🇮🇳", layout="wide")
 st.title("🇮🇳 Youth4Jobs Smart Scanner")
+
+# --- SESSION STATE SETUP ---
+if 'drive_data' not in st.session_state:
+    st.session_state['drive_data'] = None
+if 'drive_mime' not in st.session_state:
+    st.session_state['drive_mime'] = None
+
+def clear_drive_data():
+    """Callback to clear drive data if user uses Camera or Upload tabs"""
+    st.session_state['drive_data'] = None
+    st.session_state['drive_mime'] = None
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -27,22 +37,21 @@ with st.sidebar:
 
 # --- MAIN AREA ---
 tab1, tab2, tab3 = st.tabs(["📸 Camera", "📂 Upload File", "🔗 Google Drive Link"])
-image_data = None
-mime_type = "image/jpeg" # Default
+
+# Variables to hold the current "active" file
+active_image_data = None
+active_mime_type = "image/jpeg"
 
 # 1. Camera
 with tab1:
-    cam = st.camera_input("Take a photo")
-    if cam: 
-        image_data = cam.getvalue()
-        mime_type = "image/jpeg"
+    # on_change ensures that if I take a new photo, I stop looking at the Drive file
+    cam = st.camera_input("Take a photo", on_change=clear_drive_data, key="cam_widget")
 
 # 2. Upload
 with tab2:
-    up = st.file_uploader("Upload Image/PDF", type=["jpg", "png", "jpeg", "pdf"])
-    if up: 
-        image_data = up.getvalue()
-        mime_type = up.type
+    # on_change ensures that if I upload a new file, I stop looking at the Drive file
+    up = st.file_uploader("Upload Image/PDF", type=["jpg", "png", "jpeg", "pdf"], 
+                          on_change=clear_drive_data, key="up_widget")
 
 # 3. Google Drive Link
 with tab3:
@@ -56,19 +65,38 @@ with tab3:
                 if error:
                     st.error(error)
                 else:
-                    image_data = file_bytes
-                    mime_type = detected_mime
+                    # STORE IN SESSION STATE so it persists when buttons are clicked later
+                    st.session_state['drive_data'] = file_bytes
+                    st.session_state['drive_mime'] = detected_mime
                     st.success(f"Loaded: {detected_mime}")
 
+# --- DETERMINE SOURCE ---
+# Priority: 1. Drive Data (if active) -> 2. Upload -> 3. Camera
+if st.session_state['drive_data'] is not None:
+    active_image_data = st.session_state['drive_data']
+    active_mime_type = st.session_state['drive_mime']
+elif up:
+    active_image_data = up.getvalue()
+    active_mime_type = up.type
+elif cam:
+    active_image_data = cam.getvalue()
+    active_mime_type = "image/jpeg"
+
+
 # --- PROCESSING ---
-if image_data:
+if active_image_data:
     st.divider()
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.markdown(f"**Loaded Document ({mime_type})**")
-        if "image" in mime_type:
-            st.image(image_data, use_column_width=True)
+        st.markdown(f"**Loaded Document ({active_mime_type})**")
+        
+        # Helper to show source clearly
+        source_label = "Source: Google Drive" if st.session_state['drive_data'] else "Source: Local Upload/Camera"
+        st.caption(source_label)
+
+        if "image" in active_mime_type:
+            st.image(active_image_data, use_column_width=True)
         else:
             st.info("📄 PDF Document Loaded")
         
@@ -77,7 +105,7 @@ if image_data:
                 st.warning("Please enter a Google Sheet URL first.")
             else:
                 with st.spinner("Gemini is analyzing..."):
-                    result = parse_document_dynamic(image_data, target_columns, mime_type)
+                    result = parse_document_dynamic(active_image_data, target_columns, active_mime_type)
                     
                     if result and isinstance(result, list) and "error" in result[0]:
                         st.error(f"AI Error: {result[0]['error']}")
@@ -94,11 +122,8 @@ if image_data:
                      st.error("Please provide a Google Sheet URL in the sidebar.")
                 else:
                     with st.spinner("Saving all rows at once..."):
-                        # --- NEW BATCH LOGIC (Fixes 429 Quota Error) ---
-                        # Convert DataFrame to a list of dictionaries
+                        # BATCH LOGIC
                         data_to_save = edited_df.to_dict('records')
-                        
-                        # Call the batch function instead of looping
                         success = append_batch_to_sheet(sheet_url, data_to_save)
                         
                         if success:
