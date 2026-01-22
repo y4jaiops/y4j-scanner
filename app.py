@@ -4,14 +4,17 @@ from logic_gemini import parse_document_dynamic
 from logic_sheets import append_to_sheet
 from logic_drive import get_file_from_link
 
-st.set_page_config(page_title="Y4J Scanner", page_icon="🇮🇳", layout="wide")
+st.set_page_config(page_title="Y4J YouthScan App", page_icon="🇮🇳", layout="wide")
 st.title("🇮🇳 Youth4Jobs Smart Scanner")
 
+#First Name,	Last Name,	ID Type,	ID Number,	Email,	PhoneNumber,	DateOfBirth,	Gender,	DisabilityType,	Qualification,	State
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("Configuration")
     sheet_url = st.text_input("Paste Google Sheet URL here:")
-    default_cols = "Candidate Name, Phone Number, Disability Type, Education, Village/City, Skills"
+#default_cols = "Candidate Name, Phone Number, Disability Type, Education, Village/City, Skills"
+    default_cols = "First Name,	Last Name,	ID Type,	ID Number,	Email,	PhoneNumber,	DateOfBirth,	Gender,	DisabilityType,	Qualification,	State"
+
     cols_input = st.text_area("Columns to Extract", value=default_cols, height=150)
     target_columns = [x.strip() for x in cols_input.split(",") if x.strip()]
     
